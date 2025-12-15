@@ -4,7 +4,7 @@ import * as Clipboard from "expo-clipboard";
 import { Dimensions, PixelRatio } from "react-native";
 import { type Fingerprint } from "./fingerprint";
 import type { RelayClient, RelayClientOptions } from "./client";
-import type { CaptureRequest, ProcessRequest } from "./server";
+import type { CaptureRequest, ProcessRequest, ProcessResponse } from "./server";
 
 const getTimeZone = () => {
   return Localization.getCalendars()[0]?.timeZone || null;
@@ -56,7 +56,7 @@ export class RelayExpoClient implements RelayClient {
     this.options = options;
   }
 
-  async capture(url: string): Promise<void> {
+  async capture(url: string) {
     const fingerprint = await calculateFingerprint();
 
     const captureRequest: CaptureRequest = {
@@ -76,7 +76,7 @@ export class RelayExpoClient implements RelayClient {
     }
   }
 
-  async process(): Promise<void> {
+  async process() {
     const fingerprint = await calculateFingerprint();
     const request: ProcessRequest = fingerprint;
 
@@ -90,5 +90,7 @@ export class RelayExpoClient implements RelayClient {
     if (!response.ok) {
       throw new RelayError(`Process request failed with status ${response.status}`);
     }
+    const responseData = await response.json();
+    return responseData as ProcessResponse;
   }
 }

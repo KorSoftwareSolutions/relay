@@ -1,10 +1,14 @@
 import { relayExpoClient } from "@/libs/relay-client";
+import { Href, router } from "expo-router";
 import React, { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 export default function RelayProcessScreen() {
   useEffect(() => {
-    relayExpoClient.process();
+    relayExpoClient.process().then((res) => {
+      if (!res.url) return;
+      router.replace(res.url as Href);
+    });
   }, []);
 
   return (

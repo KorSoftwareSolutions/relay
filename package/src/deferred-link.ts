@@ -8,12 +8,13 @@ export interface DeferredLink {
 export interface DeferredLinkMethods {
   storeDeferredLink: (deferredLink: DeferredLink) => Promise<void>;
   getDeferredLinkByFingerprintHash: (fingerprintHash: string) => Promise<DeferredLink | null>;
+  deleteDeferredLink: (id: string) => Promise<void>;
 }
 
-export interface DeferredLinkingConfig {
+export interface DeferredLinkSdkOptions {
   expiryDays?: number;
   autoCleanup?: boolean;
-  methods?: DeferredLinkMethods;
+  methods: DeferredLinkMethods;
 }
 
 export interface CreateDeferredLinkRequest {
@@ -21,17 +22,14 @@ export interface CreateDeferredLinkRequest {
   url: string;
 }
 
-export class DeferredLinkingSdk {
-  private config: Required<DeferredLinkingConfig>;
+export class DeferredLinkSdk {
+  private config: Required<DeferredLinkSdkOptions>;
 
-  constructor(config: DeferredLinkingConfig) {
+  constructor(config: DeferredLinkSdkOptions) {
     this.config = {
       expiryDays: config.expiryDays ?? 7,
       autoCleanup: config.autoCleanup ?? true,
-      methods: {
-        storeDeferredLink: config.methods?.storeDeferredLink || defaultStoreDeferredLink,
-        getDeferredLinkByFingerprintHash: config.methods?.getDeferredLinkByFingerprintHash || defaultGetDeferredLinkByFingerprintHash,
-      },
+      methods: config.methods,
     };
   }
   async createDeferredLink(request: CreateDeferredLinkRequest): Promise<DeferredLink> {
@@ -48,14 +46,8 @@ export class DeferredLinkingSdk {
   async getDeferredLinkByFingerprintHash(fingerprintHash: string): Promise<DeferredLink | null> {
     return this.config.methods.getDeferredLinkByFingerprintHash(fingerprintHash);
   }
+
+  async deleteDeferredLink(id: string): Promise<void> {
+    return this.config.methods.deleteDeferredLink(id);
+  }
 }
-
-const localStore: Map<string, DeferredLink> = new Map();
-
-const defaultStoreDeferredLink = async (deferredLink: DeferredLink): Promise<void> => {
-  localStore.set(deferredLink.fingerprintHash, deferredLink);
-};
-
-const defaultGetDeferredLinkByFingerprintHash = async (fingerprintHash: string): Promise<DeferredLink | null> => {
-  return localStore.get(fingerprintHash) || null;
-};

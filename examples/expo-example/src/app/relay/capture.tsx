@@ -4,19 +4,19 @@ import React, { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 export default function RelayCaptureScreen() {
-  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const { returnUrl } = useLocalSearchParams<{ returnUrl?: string }>();
 
   useEffect(() => {
-    if (!returnTo) return;
-    relayExpoClient.capture(returnTo);
-  }, [returnTo]);
+    if (!returnUrl) return;
+    relayExpoClient.capture(returnUrl);
+  }, [returnUrl]);
 
   return (
     <View style={s.container}>
       <Text style={s.title}>Capture Screen</Text>
       <Text>This screen captures the relay data.</Text>
-      <Text>If a returnTo parameter is provided, it will initiate the capture.</Text>
-      <Text>Return to: {returnTo ?? "N/A"}</Text>
+      <Text>If a returnUrl parameter is provided, it will initiate the capture.</Text>
+      <Text>Return to: {returnUrl ?? "N/A"}</Text>
     </View>
   );
 }

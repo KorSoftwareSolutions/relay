@@ -6,7 +6,15 @@ export default function HomeScreen() {
   return (
     <View style={s.container}>
       <Text style={s.title}>Home Screen</Text>
-      <Button title="Capture" onPress={() => router.navigate("/relay/capture")} />
+      <Button
+        title="Capture"
+        onPress={() =>
+          router.navigate({
+            pathname: "/relay/capture",
+            params: { returnUrl: "/" },
+          })
+        }
+      />
       <Button title="Process" onPress={() => router.navigate("/relay/process")} />
     </View>
   );
