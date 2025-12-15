@@ -3,7 +3,8 @@ import * as Localization from "expo-localization";
 import * as Clipboard from "expo-clipboard";
 import { Dimensions, PixelRatio } from "react-native";
 import { type Fingerprint } from "./fingerprint";
-import type { RelayClient } from "./client";
+import type { RelayClient, RelayClientOptions } from "./client";
+import type { CaptureRequest, ProcessRequest } from "./server";
 
 const getTimeZone = () => {
   return Localization.getCalendars()[0]?.timeZone || null;
@@ -24,7 +25,7 @@ const getClipboardValue = async (): Promise<string | null> => {
   }
 };
 
-const getProbabilisticFingerprint = async (): Promise<Fingerprint> => {
+const calculateFingerprint = async (): Promise<Fingerprint> => {
   const screenDimensions = Dimensions.get("screen");
 
   return {
@@ -42,18 +43,52 @@ const getProbabilisticFingerprint = async (): Promise<Fingerprint> => {
   };
 };
 
-export class ExpoRelayClient implements RelayClient {
-  async capture(): Promise<void> {
-    const fingerprint = await getProbabilisticFingerprint();
-    // Implementation for capturing deferred link on Expo
-    console.log("Capturing deferred link on Expo device with fingerprint:", fingerprint);
-    // ... actual implementation goes here
+class RelayError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RelayError";
+  }
+}
+
+export class RelayExpoClient implements RelayClient {
+  private options: RelayClientOptions;
+  constructor(options: RelayClientOptions) {
+    this.options = options;
+  }
+
+  async capture(url: string): Promise<void> {
+    const fingerprint = await calculateFingerprint();
+
+    const captureRequest: CaptureRequest = {
+      deferredLinkUrl: url,
+      fingerprint,
+    };
+
+    const response = await fetch(`${this.options.serverUrl}/relay/capture`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(captureRequest),
+    });
+    if (!response.ok) {
+      throw new RelayError(`Capture request failed with status ${response.status}`);
+    }
   }
 
   async process(): Promise<void> {
-    const fingerprint = await getProbabilisticFingerprint();
-    // Implementation for processing deferred link on Expo
-    console.log("Processing deferred link on Expo device with fingerprint:", fingerprint);
-    // ... actual implementation goes here
+    const fingerprint = await calculateFingerprint();
+    const request: ProcessRequest = fingerprint;
+
+    const response = await fetch(`${this.options.serverUrl}/relay/process`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+    if (!response.ok) {
+      throw new RelayError(`Process request failed with status ${response.status}`);
+    }
   }
 }

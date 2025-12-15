@@ -1,6 +1,6 @@
 import z from "zod";
 import { type DeferredLink, type DeferredLinkingConfig, DeferredLinkingSdk } from "./deferred-link";
-import { createFingerprintSdk, type FingerprintMethods, fingerprintSchema } from "./fingerprint";
+import { createFingerprintSdk, type FingerprintSdkOptions, fingerprintSchema } from "./fingerprint";
 
 export interface RelayServer {
   handler: (request: Request) => Promise<Response>;
@@ -8,18 +8,19 @@ export interface RelayServer {
 
 export interface RelayConfig {
   deferredLinkingConfig?: Partial<DeferredLinkingConfig>;
-  methods?: FingerprintMethods;
+  fingerprint: FingerprintSdkOptions;
   hooks?: {
     onMatchFound?: (deferredLink: DeferredLink) => Promise<void> | void;
   };
 }
 
 const captureRequestSchema = z.object({
-  deferredLinkUrl: z.url(),
+  deferredLinkUrl: z.string().min(1),
   fingerprint: fingerprintSchema,
 });
 
 const processRequestSchema = fingerprintSchema;
+export type ProcessRequest = z.infer<typeof processRequestSchema>;
 
 const getIpAddressFromRequest = (request: Request): string | null => {
   const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip");
@@ -30,8 +31,7 @@ export type CaptureRequest = z.infer<typeof captureRequestSchema>;
 
 export const createRelayServer = (config: RelayConfig): RelayServer => {
   const fingerprintSdk = createFingerprintSdk({
-    useDefaultMethods: true,
-    methods: config.methods,
+    methods: config.fingerprint.methods,
   });
   const deferredLinkSdk = new DeferredLinkingSdk({});
 
@@ -44,8 +44,8 @@ export const createRelayServer = (config: RelayConfig): RelayServer => {
           ...requestData.fingerprint,
           ipAddress: getIpAddressFromRequest(request),
         };
-        await fingerprintSdk.storeFingerprint?.(fingerprint);
-        const fingerprintHash = await fingerprintSdk.hashFingerprint(fingerprint);
+        const fingerprintHash = await fingerprintSdk.hashFingerprint?.(fingerprint);
+        await fingerprintSdk.storeFingerprint?.(fingerprint, fingerprintHash);
         await deferredLinkSdk.createDeferredLink({
           url: requestData.deferredLinkUrl,
           fingerprintHash,
@@ -61,10 +61,15 @@ export const createRelayServer = (config: RelayConfig): RelayServer => {
         };
         const fingerprintHash = await fingerprintSdk.hashFingerprint(fingerprint);
         const deferredLink = await deferredLinkSdk.getDeferredLinkByFingerprintHash(fingerprintHash);
-        if (deferredLink) {
-          await config.hooks?.onMatchFound?.(deferredLink);
-          return Response.json({ deferredLink }, { status: 200 });
+        if (!deferredLink) {
+          return Response.json({ error: "Link not found" }, { status: 404 });
         }
+        await config.hooks?.onMatchFound?.(deferredLink);
+        return Response.json({ deferredLink }, { status: 200 });
+      }
+      if (request.method === "GET" && request.url.endsWith("/relay/fingerprints")) {
+        const fingerprints = await fingerprintSdk.listAllFingerprints?.();
+        return Response.json({ fingerprints }, { status: 200 });
       }
       return Response.json({ error: "Not Found" }, { status: 404 });
     },

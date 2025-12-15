@@ -1,7 +1,9 @@
+import { relayServer } from "@/libs/relay-server";
+
 export const GET = (request: Request) => {
-  return auth.handler(request);
+  return relayServer.handler(request);
 };
 
 export const POST = (request: Request) => {
-  return auth.handler(request);
+  return relayServer.handler(request);
 };

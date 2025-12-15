@@ -23,69 +23,48 @@ export interface FingerprintDbRecord extends Fingerprint {
   updatedDate?: Date;
 }
 
+type HashFn = (data: Fingerprint) => Promise<string>;
+
 export interface FingerprintMethods {
-  hashFingerprint(data: Fingerprint): Promise<string>;
+  hashFingerprint: HashFn;
   parseFingerprint: (data: any) => Fingerprint;
-  storeFingerprint?(data: Fingerprint): Promise<FingerprintDbRecord>;
-  getFingerprintByHash?(hash: string): Promise<FingerprintDbRecord | null>;
+  storeFingerprint: (data: Fingerprint, hash: string) => Promise<FingerprintDbRecord>;
+  getFingerprintByHash: (hash: string) => Promise<FingerprintDbRecord | null>;
+  listAllFingerprints: () => Promise<FingerprintDbRecord[]>;
 }
 
-type FingerprintParams = {
-  useDefaultMethods?: boolean;
-  methods?: Partial<FingerprintMethods>;
+export type FingerprintSdkOptions = {
+  methods: {
+    hashFingerprint?: FingerprintMethods["hashFingerprint"];
+    parseFingerprint?: FingerprintMethods["parseFingerprint"];
+    storeFingerprint: FingerprintMethods["storeFingerprint"];
+    getFingerprintByHash: FingerprintMethods["getFingerprintByHash"];
+    listAllFingerprints: FingerprintMethods["listAllFingerprints"];
+  };
 };
 
 type FingerprintSdk = FingerprintMethods;
 
-export const createFingerprintSdk = ({ useDefaultMethods = false, methods }: FingerprintParams): FingerprintSdk => {
-  const hashFn = methods?.hashFingerprint ?? defaultHashFingerprint;
-  const parseFn = methods?.parseFingerprint ?? defaultParseFingerprint;
-  let storeFn = methods?.storeFingerprint;
-  let getByHashFn = methods?.getFingerprintByHash;
-
-  if (useDefaultMethods) {
-    if (!storeFn) {
-      storeFn = defaultStoreFingerprint(hashFn);
-    }
-    if (!getByHashFn) {
-      getByHashFn = defaultGetFingerprintByHash;
-    }
-  }
-
+export const createFingerprintSdk = ({ methods }: FingerprintSdkOptions): FingerprintSdk => {
   return {
-    hashFingerprint: hashFn,
-    parseFingerprint: parseFn,
-    storeFingerprint: storeFn,
-    getFingerprintByHash: getByHashFn,
+    hashFingerprint: methods?.hashFingerprint ?? defaultHashFingerprint,
+    parseFingerprint: methods?.parseFingerprint ?? defaultParseFingerprint,
+    storeFingerprint:
+      methods?.storeFingerprint ??
+      (async () => {
+        throw new Error("storeFingerprint method not implemented");
+      }),
+    getFingerprintByHash:
+      methods?.getFingerprintByHash ??
+      (async () => {
+        throw new Error("getFingerprintByHash method not implemented");
+      }),
+    listAllFingerprints:
+      methods?.listAllFingerprints ??
+      (async () => {
+        throw new Error("listAllFingerprints method not implemented");
+      }),
   };
-};
-
-const localFingerprintStore: Map<string, FingerprintDbRecord> = new Map();
-
-const defaultStoreFingerprint =
-  (hashFn: FingerprintMethods["hashFingerprint"]) =>
-  async (data: Fingerprint): Promise<FingerprintDbRecord> => {
-    const hash = await hashFn(data);
-
-    let record = localFingerprintStore.get(hash);
-    if (record) {
-      record.updatedDate = new Date();
-      return record;
-    } else {
-      record = {
-        hash,
-        createdDate: new Date(),
-        ...data,
-      };
-    }
-
-    localFingerprintStore.set(hash, record);
-
-    return record;
-  };
-
-const defaultGetFingerprintByHash = async (hash: string): Promise<FingerprintDbRecord | null> => {
-  return localFingerprintStore.get(hash) || null;
 };
 
 const defaultHashFingerprint = async (data: Fingerprint): Promise<string> => {
@@ -108,19 +87,7 @@ const defaultHashFingerprint = async (data: Fingerprint): Promise<string> => {
 };
 
 const defaultParseFingerprint = (data: any): Fingerprint => {
-  return {
-    clipboardValue: data.clipboardValue || null,
-    ipAddress: data.ipAddress || null,
-    deviceManufacturer: data.deviceManufacturer || null,
-    deviceModel: data.deviceModel || null,
-    osName: data.osName || null,
-    osVersion: data.osVersion || null,
-    screenWidth: typeof data.screenWidth === "number" ? data.screenWidth : 0,
-    screenHeight: typeof data.screenHeight === "number" ? data.screenHeight : 0,
-    pixelRatio: typeof data.pixelRatio === "number" ? data.pixelRatio : 1,
-    timeZone: data.timeZone || null,
-    languageTags: Array.isArray(data.languageTags) ? data.languageTags : [],
-  };
+  return fingerprintSchema.parse(data);
 };
 
 export const generateHash = (payload: string): string => {
