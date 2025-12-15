@@ -1,0 +1,547 @@
+---
+title: Server Setup
+description: Configure the Relay server to handle fingerprinting and deferred link matching
+---
+
+# Server Setup
+
+The Relay server handles API requests from your client app, stores fingerprints and deferred links, and performs matching logic to reconnect users across installations.
+
+## Creating a Server Instance
+
+Use `createRelayServer()` to create a server instance with your storage and hook configurations:
+
+```typescript
+import { createRelayServer } from "@korsolutions/relay";
+
+export const relayServer = createRelayServer({
+  fingerprint: {
+    methods: {
+      storeFingerprint: async (fingerprint, hash) => {
+        // Store fingerprint in your database
+      },
+      getFingerprintByHash: async (hash) => {
+        // Retrieve fingerprint from database
+      },
+      listAllFingerprints: async () => {
+        // List all fingerprints
+      },
+    },
+  },
+  deferredLink: {
+    methods: {
+      storeDeferredLink: async (deferredLink) => {
+        // Store deferred link in your database
+      },
+      getDeferredLinkByFingerprintHash: async (fingerprintHash) => {
+        // Get link by fingerprint hash
+      },
+      deleteDeferredLink: async (id) => {
+        // Delete link after matching
+      },
+    },
+  },
+  hooks: {
+    onMatchFound: async (deferredLink) => {
+      // React to successful matches
+    },
+  },
+});
+```
+
+## Configuration Options
+
+### Fingerprint Methods
+
+```typescript
+interface FingerprintMethods {
+  // Hash a fingerprint (optional - uses default SHA-256 if not provided)
+  hashFingerprint?: (data: Fingerprint) => Promise<string>;
+
+  // Parse fingerprint data (optional - uses Zod validation by default)
+  parseFingerprint?: (data: any) => Fingerprint;
+
+  // Store a fingerprint with its hash
+  storeFingerprint: (data: Fingerprint, hash: string) => Promise<FingerprintDbRecord>;
+
+  // Retrieve a fingerprint by its hash
+  getFingerprintByHash: (hash: string) => Promise<FingerprintDbRecord | null>;
+
+  // List all stored fingerprints
+  listAllFingerprints: () => Promise<FingerprintDbRecord[]>;
+}
+```
+
+### Deferred Link Methods
+
+```typescript
+interface DeferredLinkMethods {
+  // Store a new deferred link
+  storeDeferredLink: (deferredLink: DeferredLink) => Promise<void>;
+
+  // Get a deferred link by fingerprint hash
+  getDeferredLinkByFingerprintHash: (fingerprintHash: string) => Promise<DeferredLink | null>;
+
+  // Delete a deferred link (called after successful match)
+  deleteDeferredLink: (id: string) => Promise<void>;
+}
+
+interface DeferredLink {
+  id: string;
+  fingerprintHash: string;
+  url: string;
+  createdDate: Date;
+}
+```
+
+### Hooks
+
+```typescript
+interface RelayHooks {
+  // Called when a fingerprint match is found
+  onMatchFound?: (deferredLink: DeferredLink) => Promise<void> | void;
+}
+```
+
+## Storage Examples
+
+### JSON File Storage
+
+Simple file-based storage for development:
+
+```typescript
+import { readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
+const storePath = path.join(process.cwd(), "fingerprints.json");
+const linkStorePath = path.join(process.cwd(), "links.json");
+
+export const relayServer = createRelayServer({
+  fingerprint: {
+    methods: {
+      storeFingerprint: async (fingerprint, hash) => {
+        const id = new Date().getTime().toString();
+        const record = { ...fingerprint, hash, id, createdDate: new Date() };
+
+        const store = JSON.parse(readFileSync(storePath, "utf-8"));
+        store[hash] = record;
+        writeFileSync(storePath, JSON.stringify(store, null, 2));
+
+        return record;
+      },
+      getFingerprintByHash: async (hash) => {
+        const store = JSON.parse(readFileSync(storePath, "utf-8"));
+        return store[hash] || null;
+      },
+      listAllFingerprints: async () => {
+        const store = JSON.parse(readFileSync(storePath, "utf-8"));
+        return Object.values(store);
+      },
+    },
+  },
+  deferredLink: {
+    methods: {
+      storeDeferredLink: async (link) => {
+        const store = JSON.parse(readFileSync(linkStorePath, "utf-8"));
+        store.push(link);
+        writeFileSync(linkStorePath, JSON.stringify(store, null, 2));
+      },
+      getDeferredLinkByFingerprintHash: async (hash) => {
+        const store = JSON.parse(readFileSync(linkStorePath, "utf-8"));
+        return store.find(link => link.fingerprintHash === hash) || null;
+      },
+      deleteDeferredLink: async (id) => {
+        let store = JSON.parse(readFileSync(linkStorePath, "utf-8"));
+        store = store.filter(link => link.id !== id);
+        writeFileSync(linkStorePath, JSON.stringify(store, null, 2));
+      },
+    },
+  },
+});
+```
+
+### PostgreSQL Storage
+
+Production-ready database storage:
+
+```typescript
+import { db } from "./database"; // Your database client
+
+export const relayServer = createRelayServer({
+  fingerprint: {
+    methods: {
+      storeFingerprint: async (fingerprint, hash) => {
+        const result = await db.query(
+          `INSERT INTO fingerprints (hash, data, created_at)
+           VALUES ($1, $2, NOW())
+           RETURNING *`,
+          [hash, JSON.stringify(fingerprint)]
+        );
+        return result.rows[0];
+      },
+      getFingerprintByHash: async (hash) => {
+        const result = await db.query(
+          `SELECT * FROM fingerprints WHERE hash = $1`,
+          [hash]
+        );
+        return result.rows[0] || null;
+      },
+      listAllFingerprints: async () => {
+        const result = await db.query(
+          `SELECT * FROM fingerprints ORDER BY created_at DESC`
+        );
+        return result.rows;
+      },
+    },
+  },
+  deferredLink: {
+    methods: {
+      storeDeferredLink: async (link) => {
+        await db.query(
+          `INSERT INTO deferred_links (id, fingerprint_hash, url, created_at)
+           VALUES ($1, $2, $3, $4)`,
+          [link.id, link.fingerprintHash, link.url, link.createdDate]
+        );
+      },
+      getDeferredLinkByFingerprintHash: async (hash) => {
+        const result = await db.query(
+          `SELECT * FROM deferred_links
+           WHERE fingerprint_hash = $1
+           AND created_at > NOW() - INTERVAL '7 days'
+           ORDER BY created_at DESC
+           LIMIT 1`,
+          [hash]
+        );
+        return result.rows[0] || null;
+      },
+      deleteDeferredLink: async (id) => {
+        await db.query(
+          `DELETE FROM deferred_links WHERE id = $1`,
+          [id]
+        );
+      },
+    },
+  },
+});
+```
+
+### Prisma Storage
+
+Using Prisma ORM:
+
+```typescript
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+export const relayServer = createRelayServer({
+  fingerprint: {
+    methods: {
+      storeFingerprint: async (fingerprint, hash) => {
+        return await prisma.fingerprint.create({
+          data: {
+            hash,
+            deviceManufacturer: fingerprint.deviceManufacturer,
+            deviceModel: fingerprint.deviceModel,
+            osName: fingerprint.osName,
+            osVersion: fingerprint.osVersion,
+            screenWidth: fingerprint.screenWidth,
+            screenHeight: fingerprint.screenHeight,
+            pixelRatio: fingerprint.pixelRatio,
+            timeZone: fingerprint.timeZone,
+            languageTags: fingerprint.languageTags,
+            clipboardValue: fingerprint.clipboardValue,
+            ipAddress: fingerprint.ipAddress,
+          },
+        });
+      },
+      getFingerprintByHash: async (hash) => {
+        return await prisma.fingerprint.findUnique({
+          where: { hash },
+        });
+      },
+      listAllFingerprints: async () => {
+        return await prisma.fingerprint.findMany({
+          orderBy: { createdDate: 'desc' },
+        });
+      },
+    },
+  },
+  deferredLink: {
+    methods: {
+      storeDeferredLink: async (link) => {
+        await prisma.deferredLink.create({
+          data: link,
+        });
+      },
+      getDeferredLinkByFingerprintHash: async (hash) => {
+        return await prisma.deferredLink.findFirst({
+          where: {
+            fingerprintHash: hash,
+            createdDate: {
+              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
+            },
+          },
+          orderBy: { createdDate: 'desc' },
+        });
+      },
+      deleteDeferredLink: async (id) => {
+        await prisma.deferredLink.delete({
+          where: { id },
+        });
+      },
+    },
+  },
+});
+```
+
+## API Endpoints
+
+The Relay server handler automatically handles these endpoints:
+
+### POST /relay/capture
+
+Captures a device fingerprint and associates it with a URL.
+
+**Request Body:**
+```typescript
+{
+  deferredLinkUrl: string;
+  fingerprint: {
+    deviceManufacturer: string | null;
+    deviceModel: string | null;
+    osName: string | null;
+    osVersion: string | null;
+    screenWidth: number;
+    screenHeight: number;
+    pixelRatio: number;
+    timeZone: string | null;
+    languageTags: string[];
+    clipboardValue: string | null;
+  }
+}
+```
+
+**Response:**
+```typescript
+{
+  success: true
+}
+```
+
+### POST /relay/process
+
+Processes a fingerprint and returns any matching deferred link.
+
+**Request Body:**
+```typescript
+{
+  deviceManufacturer: string | null;
+  deviceModel: string | null;
+  osName: string | null;
+  osVersion: string | null;
+  screenWidth: number;
+  screenHeight: number;
+  pixelRatio: number;
+  timeZone: string | null;
+  languageTags: string[];
+  clipboardValue: string | null;
+}
+```
+
+**Response:**
+```typescript
+{
+  url: string | null // The matched URL, or null if no match
+}
+```
+
+### GET /relay/fingerprints
+
+Lists all stored fingerprints (useful for debugging).
+
+**Response:**
+```typescript
+{
+  fingerprints: FingerprintDbRecord[]
+}
+```
+
+## Setting Up the Handler
+
+### With Expo Router
+
+```typescript
+// app/api/[...route]+api.ts
+import { relayServer } from "@/libs/relay-server";
+
+export const GET = (request: Request) => {
+  return relayServer.handler(request);
+};
+
+export const POST = (request: Request) => {
+  return relayServer.handler(request);
+};
+```
+
+### With Next.js API Routes
+
+```typescript
+// pages/api/[...relay].ts
+import { relayServer } from "@/libs/relay-server";
+import type { NextApiRequest, NextApiResponse } from "next";
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const request = new Request(`http://localhost:3000${req.url}`, {
+    method: req.method,
+    headers: new Headers(req.headers as HeadersInit),
+    body: req.method !== "GET" ? JSON.stringify(req.body) : undefined,
+  });
+
+  const response = await relayServer.handler(request);
+  const data = await response.json();
+
+  res.status(response.status).json(data);
+}
+```
+
+### With Express
+
+```typescript
+import express from "express";
+import { relayServer } from "./relay-server";
+
+const app = express();
+app.use(express.json());
+
+app.all("/api/relay/*", async (req, res) => {
+  const request = new Request(`http://localhost:${port}${req.url}`, {
+    method: req.method,
+    headers: new Headers(req.headers as HeadersInit),
+    body: req.method !== "GET" ? JSON.stringify(req.body) : undefined,
+  });
+
+  const response = await relayServer.handler(request);
+  const data = await response.json();
+
+  res.status(response.status).json(data);
+});
+```
+
+## Using Hooks
+
+Hooks let you react to events in the Relay flow:
+
+### onMatchFound Hook
+
+Called when a fingerprint match is found:
+
+```typescript
+export const relayServer = createRelayServer({
+  // ... storage config
+  hooks: {
+    onMatchFound: async (deferredLink) => {
+      console.log(`Match found for link: ${deferredLink.url}`);
+
+      // Send analytics event
+      await analytics.track('deferred_link_matched', {
+        url: deferredLink.url,
+        fingerprintHash: deferredLink.fingerprintHash,
+      });
+
+      // Update database
+      await db.incrementMatchCount(deferredLink.url);
+
+      // Send notification
+      await notifyReferrer(deferredLink.url);
+    },
+  },
+});
+```
+
+## Fingerprint Hashing
+
+By default, Relay uses SHA-256 to hash fingerprints. You can provide a custom hashing function:
+
+```typescript
+import crypto from "crypto";
+
+export const relayServer = createRelayServer({
+  fingerprint: {
+    methods: {
+      hashFingerprint: async (fingerprint) => {
+        // Custom hashing logic
+        const data = JSON.stringify({
+          // Only include specific fields
+          device: fingerprint.deviceModel,
+          os: fingerprint.osVersion,
+          screen: `${fingerprint.screenWidth}x${fingerprint.screenHeight}`,
+        });
+
+        return crypto.createHash("md5").update(data).digest("hex");
+      },
+      // ... other methods
+    },
+  },
+});
+```
+
+## Best Practices
+
+### 1. Set Link Expiration
+
+Delete old deferred links to prevent stale matches:
+
+```typescript
+getDeferredLinkByFingerprintHash: async (hash) => {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  return await db.query(
+    `SELECT * FROM deferred_links
+     WHERE fingerprint_hash = $1
+     AND created_at > $2
+     LIMIT 1`,
+    [hash, sevenDaysAgo]
+  );
+},
+```
+
+### 2. Index Database Columns
+
+Index frequently queried columns for better performance:
+
+```sql
+CREATE INDEX idx_fingerprints_hash ON fingerprints(hash);
+CREATE INDEX idx_links_fingerprint_hash ON deferred_links(fingerprint_hash);
+CREATE INDEX idx_links_created_at ON deferred_links(created_at);
+```
+
+### 3. Clean Up Matched Links
+
+Delete deferred links after they're matched to prevent duplicate matches:
+
+```typescript
+// The server automatically calls deleteDeferredLink after a match
+// Make sure your implementation actually deletes the record
+```
+
+### 4. Monitor Performance
+
+Track key metrics:
+
+```typescript
+hooks: {
+  onMatchFound: async (deferredLink) => {
+    const matchTime = Date.now() - new Date(deferredLink.createdDate).getTime();
+
+    await metrics.record('relay_match_time', matchTime);
+    await metrics.increment('relay_matches_total');
+  },
+},
+```
+
+## Next Steps
+
+- [Database Integration](/docs/database) - Set up production databases
+- [API Reference](/docs/api-reference) - Detailed API documentation
+- [Production Deployment](/docs/deployment) - Deploy to production

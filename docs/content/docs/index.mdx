@@ -1,0 +1,131 @@
+---
+title: Introduction
+description: Relay - Deferred linking and referral attribution library for React Native and Expo
+---
+
+# Relay
+
+**Relay** is a powerful deferred linking and referral attribution library designed for React Native and Expo applications. It enables seamless attribution tracking by matching users across app installations using device fingerprinting.
+
+## What is Deferred Linking?
+
+Deferred linking allows you to attribute a user's actions before app installation to their behavior after installation. This is crucial for:
+
+- **Referral Programs**: Track who referred a new user
+- **Marketing Campaigns**: Attribute app installs to specific campaigns
+- **Deep Linking**: Redirect users to specific content after installation
+- **User Attribution**: Match pre-install and post-install user sessions
+
+## How Relay Works
+
+Relay uses a two-step process to match users across sessions:
+
+### 1. Capture Phase (Pre-Install)
+
+When a user clicks a referral link or visits your landing page:
+
+```typescript
+// User clicks referral link with returnTo parameter
+// e.g., yourapp.com/relay/capture?returnTo=https://example.com/invite/abc123
+
+await relayExpoClient.capture(returnToUrl);
+```
+
+Relay captures a unique device fingerprint including:
+- Device manufacturer and model
+- Operating system details
+- Screen dimensions and pixel ratio
+- Timezone and language settings
+- IP address
+- Clipboard content (optional)
+
+### 2. Process Phase (Post-Install)
+
+When the user opens your app after installation:
+
+```typescript
+const result = await relayExpoClient.process();
+
+if (result.url) {
+  // Match found! Redirect user to the deferred link
+  router.push(result.url);
+}
+```
+
+Relay generates a new fingerprint and matches it against stored fingerprints to retrieve the original link.
+
+## Key Features
+
+- 🎯 **Accurate Attribution**: Uses multi-factor device fingerprinting
+- 📱 **Expo & React Native**: Built specifically for mobile apps
+- 🔒 **Privacy-Focused**: No third-party tracking services required
+- ⚙️ **Flexible Storage**: Bring your own database (file-based, SQL, NoSQL)
+- 🪝 **Customizable Hooks**: React to match events with custom logic
+- 📊 **Built-in Analytics**: Track fingerprints and link performance
+
+## Quick Start
+
+Get started with Relay in minutes:
+
+```bash
+pnpm add @korsolutions/relay
+```
+
+See the [Installation Guide](/docs/installation) for detailed setup instructions.
+
+## Use Cases
+
+### Referral Programs
+
+Track who referred each new user and reward them accordingly:
+
+```typescript
+const result = await relayExpoClient.process();
+if (result.url) {
+  const referrerId = extractReferrerFromUrl(result.url);
+  await rewardReferrer(referrerId);
+}
+```
+
+### Marketing Attribution
+
+Attribute app installs to specific marketing campaigns:
+
+```typescript
+// Capture with campaign URL
+await relayExpoClient.capture('https://yourapp.com/campaign/summer-sale');
+
+// Process and track conversion
+const result = await relayExpoClient.process();
+if (result.url?.includes('summer-sale')) {
+  trackConversion('summer-sale');
+}
+```
+
+### Content Deep Linking
+
+Direct new users to specific content after installation:
+
+```typescript
+const result = await relayExpoClient.process();
+if (result.url) {
+  // Navigate to the specific content
+  router.push(result.url);
+}
+```
+
+## Architecture
+
+Relay consists of two main components:
+
+1. **Client SDK** (`RelayExpoClient`): Runs in your Expo/React Native app
+2. **Server SDK** (`createRelayServer`): Handles API requests and data storage
+
+Both components work together to provide seamless attribution tracking.
+
+## Next Steps
+
+- [Installation](/docs/installation) - Install and configure Relay
+- [Client Setup](/docs/client) - Configure the Expo client
+- [Server Setup](/docs/server) - Set up the server-side API
+- [API Reference](/docs/api-reference) - Detailed API documentation

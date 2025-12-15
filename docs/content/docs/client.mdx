@@ -1,0 +1,377 @@
+---
+title: Client Setup
+description: Configure and use the Relay Expo client in your React Native application
+---
+
+# Client Setup
+
+The Relay client (`RelayExpoClient`) runs in your Expo/React Native application and handles device fingerprinting and communication with your Relay server.
+
+## Creating a Client Instance
+
+Create a singleton client instance that you'll use throughout your app:
+
+```typescript
+// src/libs/relay-client.ts
+import { RelayExpoClient } from "@korsolutions/relay";
+
+export const relayExpoClient = new RelayExpoClient({
+  serverUrl: "http://localhost:8081/api",
+});
+```
+
+### Configuration Options
+
+```typescript
+interface RelayClientOptions {
+  serverUrl: string; // Base URL of your Relay API server
+}
+```
+
+**Important**: For production, update `serverUrl` to your deployed API endpoint (e.g., `https://api.yourapp.com`).
+
+## Capture Method
+
+The `capture()` method records a device fingerprint and associates it with a URL. Call this when a user clicks a referral link or performs a trackable action before app installation.
+
+### Usage
+
+```typescript
+await relayExpoClient.capture(url);
+```
+
+### Parameters
+
+- `url` (string): The URL to associate with this device fingerprint. This is typically a deep link or referral URL.
+
+### Example: Capture Screen
+
+```typescript
+import { relayExpoClient } from "@/libs/relay-client";
+import { useLocalSearchParams } from "expo-router";
+import { useEffect } from "react";
+import { View, Text } from "react-native";
+
+export default function CaptureScreen() {
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+
+  useEffect(() => {
+    if (returnTo) {
+      captureLink(returnTo);
+    }
+  }, [returnTo]);
+
+  const captureLink = async (url: string) => {
+    try {
+      await relayExpoClient.capture(url);
+      console.log("Capture successful!");
+    } catch (error) {
+      console.error("Capture failed:", error);
+    }
+  };
+
+  return (
+    <View>
+      <Text>Capturing referral data...</Text>
+      <Text>{returnTo ?? "No URL provided"}</Text>
+    </View>
+  );
+}
+```
+
+### What Gets Captured?
+
+When you call `capture()`, the following device information is collected and sent to your server:
+
+- **Device Info**:
+  - `deviceManufacturer` - e.g., "Apple", "Samsung"
+  - `deviceModel` - e.g., "iPhone 15 Pro", "Galaxy S24"
+- **Operating System**:
+  - `osName` - e.g., "iOS", "Android"
+  - `osVersion` - e.g., "17.1", "14"
+- **Screen Properties**:
+  - `screenWidth` - Screen width in pixels
+  - `screenHeight` - Screen height in pixels
+  - `pixelRatio` - Device pixel ratio
+- **Locale**:
+  - `timeZone` - e.g., "America/New_York"
+  - `languageTags` - Array of language codes, e.g., ["en-US", "es-MX"]
+- **Additional**:
+  - `clipboardValue` - Current clipboard content (if accessible)
+  - `ipAddress` - User's IP address (captured server-side)
+
+## Process Method
+
+The `process()` method checks if there's a matching fingerprint and retrieves the associated URL. Call this when a user opens your app for the first time after installation.
+
+### Usage
+
+```typescript
+const result = await relayExpoClient.process();
+```
+
+### Return Value
+
+```typescript
+interface ProcessResponse {
+  url: string | null; // The matched URL, or null if no match found
+}
+```
+
+### Example: Process Screen
+
+```typescript
+import { relayExpoClient } from "@/libs/relay-client";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { View, Text, ActivityIndicator } from "react-native";
+
+export default function ProcessScreen() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [matchedUrl, setMatchedUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    processFingerprint();
+  }, []);
+
+  const processFingerprint = async () => {
+    try {
+      const result = await relayExpoClient.process();
+
+      if (result.url) {
+        setMatchedUrl(result.url);
+
+        // Extract referral code from URL
+        const referralCode = extractReferralCode(result.url);
+        if (referralCode) {
+          // Handle the referral
+          await handleReferral(referralCode);
+        }
+
+        // Navigate to the matched URL or a specific screen
+        router.replace(result.url);
+      }
+    } catch (error) {
+      console.error("Process failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View>
+        <ActivityIndicator />
+        <Text>Checking for referral...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      {matchedUrl ? (
+        <Text>Referral found! Redirecting...</Text>
+      ) : (
+        <Text>No referral detected.</Text>
+      )}
+    </View>
+  );
+}
+```
+
+## Integration Patterns
+
+### App Launch Flow
+
+Process the fingerprint when your app launches to check for deferred links:
+
+```typescript
+// app/_layout.tsx
+import { relayExpoClient } from "@/libs/relay-client";
+import { useEffect } from "react";
+import { useRouter } from "expo-router";
+
+export default function RootLayout() {
+  const router = useRouter();
+
+  useEffect(() => {
+    checkDeferredLink();
+  }, []);
+
+  const checkDeferredLink = async () => {
+    const result = await relayExpoClient.process();
+
+    if (result.url) {
+      // Handle the deferred link
+      router.push(result.url);
+    }
+  };
+
+  return (
+    // Your app layout
+  );
+}
+```
+
+### Referral Program
+
+Implement a referral program using Relay:
+
+```typescript
+// Capture side (web/landing page)
+const shareReferral = async (userId: string) => {
+  const referralUrl = `https://yourapp.com/referral/${userId}`;
+  await relayExpoClient.capture(referralUrl);
+
+  // Show share UI
+  showShareDialog(referralUrl);
+};
+
+// Process side (app launch)
+const processReferral = async () => {
+  const result = await relayExpoClient.process();
+
+  if (result.url?.includes('/referral/')) {
+    const referrerId = extractUserId(result.url);
+
+    // Credit the referrer
+    await api.creditReferral(referrerId);
+
+    // Give reward to new user
+    await api.giveWelcomeBonus();
+
+    // Navigate to onboarding
+    router.push('/onboarding');
+  }
+};
+```
+
+### Deep Linking to Content
+
+Direct users to specific content after installation:
+
+```typescript
+// Capture side
+await relayExpoClient.capture('https://yourapp.com/content/article-123');
+
+// Process side
+const result = await relayExpoClient.process();
+
+if (result.url) {
+  // Parse the URL to extract content ID
+  const contentId = extractContentId(result.url);
+
+  // Navigate to the content
+  router.push(`/articles/${contentId}`);
+}
+```
+
+## Error Handling
+
+Always wrap Relay calls in try-catch blocks:
+
+```typescript
+try {
+  await relayExpoClient.capture(url);
+} catch (error) {
+  if (error instanceof Error) {
+    console.error("Relay error:", error.message);
+
+    // Handle specific errors
+    if (error.message.includes('failed with status')) {
+      // Server error
+      showErrorToast("Unable to process referral. Please try again.");
+    }
+  }
+}
+```
+
+## Common Errors
+
+### Capture Failed with Status 404
+
+The server endpoint is not found. Check that:
+- Your server is running
+- The `serverUrl` in your client config is correct
+- The API route is properly configured
+
+### Capture Failed with Status 500
+
+Server error. Check your server logs for details. Common causes:
+- Database connection failed
+- Invalid storage configuration
+- Missing required fields in fingerprint
+
+### Network Request Failed
+
+The client cannot reach the server. Check:
+- Network connectivity
+- Server URL is accessible from the device
+- CORS is configured correctly (for web)
+
+## Best Practices
+
+### 1. Call Process Early
+
+Call `process()` as early as possible in your app lifecycle:
+
+```typescript
+// App.tsx or _layout.tsx
+useEffect(() => {
+  relayExpoClient.process();
+}, []);
+```
+
+### 2. Handle No Match Gracefully
+
+Not every user will have a matching fingerprint:
+
+```typescript
+const result = await relayExpoClient.process();
+
+if (result.url) {
+  handleReferral(result.url);
+} else {
+  // Normal app flow for non-referred users
+  router.replace('/home');
+}
+```
+
+### 3. Don't Block UI
+
+Process fingerprints in the background:
+
+```typescript
+useEffect(() => {
+  // Don't await - let it run in background
+  relayExpoClient.process().then(result => {
+    if (result.url) {
+      handleDeferredLink(result.url);
+    }
+  });
+
+  // Continue with normal app initialization
+  initializeApp();
+}, []);
+```
+
+### 4. Cache Results
+
+Avoid calling `process()` multiple times:
+
+```typescript
+const [processResult, setProcessResult] = useState<ProcessResponse | null>(null);
+
+useEffect(() => {
+  if (!processResult) {
+    relayExpoClient.process().then(setProcessResult);
+  }
+}, []);
+```
+
+## Next Steps
+
+- [Server Setup](/docs/server) - Configure the server-side
+- [API Reference](/docs/api-reference) - Detailed API documentation
+- [Database Integration](/docs/database) - Use a production database

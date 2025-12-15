@@ -1,0 +1,523 @@
+---
+title: API Reference
+description: Complete API reference for Relay client and server
+---
+
+# API Reference
+
+Complete reference for all Relay types, interfaces, and methods.
+
+## Client API
+
+### RelayExpoClient
+
+The main client class for interacting with Relay from your Expo/React Native app.
+
+#### Constructor
+
+```typescript
+new RelayExpoClient(options: RelayClientOptions)
+```
+
+**Parameters:**
+- `options.serverUrl` (string): Base URL of your Relay API server
+
+**Example:**
+```typescript
+const client = new RelayExpoClient({
+  serverUrl: "https://api.yourapp.com"
+});
+```
+
+#### capture()
+
+Captures a device fingerprint and associates it with a URL.
+
+```typescript
+capture(url: string): Promise<void>
+```
+
+**Parameters:**
+- `url` (string): The URL to associate with this device fingerprint
+
+**Returns:** Promise that resolves when capture is complete
+
+**Throws:** `RelayError` if the request fails
+
+**Example:**
+```typescript
+await client.capture("https://yourapp.com/invite/abc123");
+```
+
+#### process()
+
+Processes the current device fingerprint and retrieves any matching deferred link.
+
+```typescript
+process(): Promise<ProcessResponse>
+```
+
+**Returns:** Promise that resolves to a `ProcessResponse` object
+
+**Throws:** `RelayError` if the request fails
+
+**Example:**
+```typescript
+const result = await client.process();
+if (result.url) {
+  console.log("Match found:", result.url);
+}
+```
+
+### Types
+
+#### RelayClientOptions
+
+```typescript
+interface RelayClientOptions {
+  serverUrl: string;
+}
+```
+
+#### ProcessResponse
+
+```typescript
+interface ProcessResponse {
+  url: string | null;
+}
+```
+
+**Properties:**
+- `url`: The matched deferred link URL, or `null` if no match was found
+
+#### RelayError
+
+```typescript
+class RelayError extends Error {
+  name: "RelayError";
+  message: string;
+}
+```
+
+Error thrown when Relay operations fail.
+
+## Server API
+
+### createRelayServer()
+
+Creates a Relay server instance.
+
+```typescript
+createRelayServer(config: RelayConfig): RelayServer
+```
+
+**Parameters:**
+- `config`: Server configuration object
+
+**Returns:** `RelayServer` instance
+
+**Example:**
+```typescript
+const server = createRelayServer({
+  fingerprint: {
+    methods: {
+      storeFingerprint: async (fp, hash) => { /* ... */ },
+      getFingerprintByHash: async (hash) => { /* ... */ },
+      listAllFingerprints: async () => { /* ... */ },
+    },
+  },
+  deferredLink: {
+    methods: {
+      storeDeferredLink: async (link) => { /* ... */ },
+      getDeferredLinkByFingerprintHash: async (hash) => { /* ... */ },
+      deleteDeferredLink: async (id) => { /* ... */ },
+    },
+  },
+});
+```
+
+### Types
+
+#### RelayServer
+
+```typescript
+interface RelayServer {
+  handler: (request: Request) => Promise<Response>;
+}
+```
+
+**Methods:**
+- `handler`: Request handler function for processing Relay API requests
+
+#### RelayConfig
+
+```typescript
+interface RelayConfig {
+  fingerprint: FingerprintSdkOptions;
+  deferredLink: DeferredLinkSdkOptions;
+  hooks?: {
+    onMatchFound?: (deferredLink: DeferredLink) => Promise<void> | void;
+  };
+}
+```
+
+**Properties:**
+- `fingerprint`: Fingerprint storage and processing configuration
+- `deferredLink`: Deferred link storage configuration
+- `hooks`: Optional event hooks
+
+#### FingerprintSdkOptions
+
+```typescript
+interface FingerprintSdkOptions {
+  methods: {
+    hashFingerprint?: (data: Fingerprint) => Promise<string>;
+    parseFingerprint?: (data: any) => Fingerprint;
+    storeFingerprint: (data: Fingerprint, hash: string) => Promise<FingerprintDbRecord>;
+    getFingerprintByHash: (hash: string) => Promise<FingerprintDbRecord | null>;
+    listAllFingerprints: () => Promise<FingerprintDbRecord[]>;
+  };
+}
+```
+
+**Methods:**
+- `hashFingerprint` (optional): Custom fingerprint hashing function. Defaults to SHA-256.
+- `parseFingerprint` (optional): Custom fingerprint parsing function. Defaults to Zod validation.
+- `storeFingerprint`: Store a fingerprint with its hash
+- `getFingerprintByHash`: Retrieve a fingerprint by its hash
+- `listAllFingerprints`: List all stored fingerprints
+
+#### DeferredLinkSdkOptions
+
+```typescript
+interface DeferredLinkSdkOptions {
+  expiryDays?: number;     // Default: 7
+  autoCleanup?: boolean;   // Default: true
+  methods: DeferredLinkMethods;
+}
+```
+
+**Properties:**
+- `expiryDays`: Number of days before links expire (not enforced by SDK, implement in your storage)
+- `autoCleanup`: Whether to automatically clean up expired links (not enforced by SDK, implement in your storage)
+- `methods`: Deferred link storage methods
+
+#### DeferredLinkMethods
+
+```typescript
+interface DeferredLinkMethods {
+  storeDeferredLink: (deferredLink: DeferredLink) => Promise<void>;
+  getDeferredLinkByFingerprintHash: (fingerprintHash: string) => Promise<DeferredLink | null>;
+  deleteDeferredLink: (id: string) => Promise<void>;
+}
+```
+
+**Methods:**
+- `storeDeferredLink`: Store a new deferred link
+- `getDeferredLinkByFingerprintHash`: Get a deferred link by fingerprint hash
+- `deleteDeferredLink`: Delete a deferred link by ID
+
+## Data Types
+
+### Fingerprint
+
+```typescript
+interface Fingerprint {
+  clipboardValue: string | null;
+  ipAddress: string | null;
+  deviceManufacturer: string | null;
+  deviceModel: string | null;
+  osName: string | null;
+  osVersion: string | null;
+  screenWidth: number;
+  screenHeight: number;
+  pixelRatio: number;
+  timeZone: string | null;
+  languageTags: string[];
+}
+```
+
+**Properties:**
+- `clipboardValue`: Current clipboard content
+- `ipAddress`: User's IP address (captured server-side from request headers)
+- `deviceManufacturer`: Device manufacturer (e.g., "Apple", "Samsung")
+- `deviceModel`: Device model (e.g., "iPhone 15 Pro")
+- `osName`: Operating system name (e.g., "iOS", "Android")
+- `osVersion`: Operating system version (e.g., "17.1")
+- `screenWidth`: Screen width in pixels
+- `screenHeight`: Screen height in pixels
+- `pixelRatio`: Device pixel ratio
+- `timeZone`: User's timezone (e.g., "America/New_York")
+- `languageTags`: Array of language codes (e.g., ["en-US", "es-MX"])
+
+### FingerprintDbRecord
+
+```typescript
+interface FingerprintDbRecord extends Fingerprint {
+  hash: string;
+  createdDate: Date;
+  updatedDate?: Date;
+}
+```
+
+**Properties:**
+- All properties from `Fingerprint`
+- `hash`: SHA-256 hash of the fingerprint
+- `createdDate`: When the fingerprint was created
+- `updatedDate`: When the fingerprint was last updated (optional)
+
+### DeferredLink
+
+```typescript
+interface DeferredLink {
+  id: string;
+  fingerprintHash: string;
+  url: string;
+  createdDate: Date;
+}
+```
+
+**Properties:**
+- `id`: Unique identifier for the deferred link (UUID)
+- `fingerprintHash`: Hash of the associated fingerprint
+- `url`: The URL to return when a match is found
+- `createdDate`: When the link was created
+
+### CaptureRequest
+
+```typescript
+interface CaptureRequest {
+  deferredLinkUrl: string;
+  fingerprint: Fingerprint;
+}
+```
+
+**Properties:**
+- `deferredLinkUrl`: The URL to associate with the fingerprint
+- `fingerprint`: The device fingerprint data
+
+### ProcessRequest
+
+```typescript
+type ProcessRequest = Fingerprint;
+```
+
+The process request is simply a `Fingerprint` object.
+
+## API Endpoints
+
+### POST /relay/capture
+
+Capture a device fingerprint.
+
+**Request:**
+```typescript
+{
+  deferredLinkUrl: string;
+  fingerprint: Fingerprint;
+}
+```
+
+**Response:**
+```typescript
+{
+  success: true
+}
+```
+
+**Status Codes:**
+- `200`: Success
+- `400`: Invalid request body
+- `500`: Server error
+
+### POST /relay/process
+
+Process a fingerprint and get matching link.
+
+**Request:**
+```typescript
+Fingerprint
+```
+
+**Response:**
+```typescript
+{
+  url: string | null
+}
+```
+
+**Status Codes:**
+- `200`: Success (even if no match found, check `url` for `null`)
+- `400`: Invalid request body
+- `500`: Server error
+
+### GET /relay/fingerprints
+
+List all stored fingerprints (for debugging).
+
+**Response:**
+```typescript
+{
+  fingerprints: FingerprintDbRecord[]
+}
+```
+
+**Status Codes:**
+- `200`: Success
+- `500`: Server error
+
+## Validation Schemas
+
+Relay uses Zod for runtime validation. Here are the validation schemas:
+
+### fingerprintSchema
+
+```typescript
+const fingerprintSchema = z.object({
+  clipboardValue: z.string().nullable(),
+  ipAddress: z.string().nullable(),
+  deviceManufacturer: z.string().nullable(),
+  deviceModel: z.string().nullable(),
+  osName: z.string().nullable(),
+  osVersion: z.string().nullable(),
+  screenWidth: z.number(),
+  screenHeight: z.number(),
+  pixelRatio: z.number(),
+  timeZone: z.string().nullable(),
+  languageTags: z.array(z.string()),
+});
+```
+
+### captureRequestSchema
+
+```typescript
+const captureRequestSchema = z.object({
+  deferredLinkUrl: z.string().min(1),
+  fingerprint: fingerprintSchema,
+});
+```
+
+### processRequestSchema
+
+```typescript
+const processRequestSchema = fingerprintSchema;
+```
+
+## Error Handling
+
+### Client Errors
+
+The client throws `RelayError` instances:
+
+```typescript
+try {
+  await client.capture(url);
+} catch (error) {
+  if (error instanceof RelayError) {
+    console.error("Relay error:", error.message);
+  }
+}
+```
+
+Common error messages:
+- `"Capture request failed with status 404"`: Server endpoint not found
+- `"Capture request failed with status 500"`: Server error
+- `"Process request failed with status 404"`: Server endpoint not found
+- `"Process request failed with status 500"`: Server error
+
+### Server Errors
+
+The server returns standard HTTP error responses:
+
+**400 Bad Request:**
+```json
+{
+  "error": "Validation error message"
+}
+```
+
+**404 Not Found:**
+```json
+{
+  "error": "Not Found"
+}
+```
+
+**500 Internal Server Error:**
+```json
+{
+  "error": "Internal server error"
+}
+```
+
+## Utility Functions
+
+### generateHash()
+
+Generate a SHA-256 hash from a string.
+
+```typescript
+export function generateHash(payload: string): string
+```
+
+**Parameters:**
+- `payload`: String to hash
+
+**Returns:** Hex-encoded SHA-256 hash
+
+**Example:**
+```typescript
+import { generateHash } from "@korsolutions/relay";
+
+const hash = generateHash("some-data");
+console.log(hash); // "abc123..."
+```
+
+## Constants
+
+### Default Hash Function
+
+The default fingerprint hashing function uses SHA-256:
+
+```typescript
+const defaultHashFingerprint = async (data: Fingerprint): Promise<string> => {
+  const stringToHash = JSON.stringify({
+    ipAddress: data.ipAddress,
+    deviceManufacturer: data.deviceManufacturer,
+    deviceModel: data.deviceModel,
+    osName: data.osName,
+    osVersion: data.osVersion,
+    screenWidth: data.screenWidth,
+    screenHeight: data.screenHeight,
+    pixelRatio: data.pixelRatio,
+    timeZone: data.timeZone,
+    languageTags: data.languageTags,
+    clipboardValue: data.clipboardValue,
+  });
+
+  return generateHash(stringToHash);
+};
+```
+
+### Default Expiry
+
+Deferred links default to 7 days expiry (if implemented in your storage):
+
+```typescript
+const DEFAULT_EXPIRY_DAYS = 7;
+```
+
+## TypeScript Support
+
+Relay is written in TypeScript and provides full type definitions. All types are exported from the main package:
+
+```typescript
+import type {
+  Fingerprint,
+  FingerprintDbRecord,
+  DeferredLink,
+  RelayClientOptions,
+  RelayConfig,
+  ProcessResponse,
+} from "@korsolutions/relay";
+```

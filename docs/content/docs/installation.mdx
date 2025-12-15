@@ -1,0 +1,337 @@
+---
+title: Installation
+description: Install and configure Relay in your Expo application
+---
+
+# Installation
+
+This guide will walk you through installing and configuring Relay in your Expo application.
+
+## Prerequisites
+
+Before installing Relay, ensure you have:
+
+- An Expo application (SDK 50+)
+- Node.js 18+ and pnpm (or npm/yarn)
+- React Native 0.81+
+- TypeScript (recommended)
+
+## Install Dependencies
+
+Install the Relay package and required peer dependencies:
+
+```bash
+pnpm add @korsolutions/relay
+pnpm add expo-clipboard expo-device expo-localization
+```
+
+### Peer Dependencies
+
+Relay requires these Expo modules for device fingerprinting:
+
+- `expo-clipboard` - Reads clipboard content (optional but recommended)
+- `expo-device` - Gets device manufacturer and model information
+- `expo-localization` - Retrieves timezone and language settings
+
+## Project Structure
+
+For this guide, we'll set up a typical Relay implementation with:
+
+- Client-side routes for capture and process screens
+- Server-side API routes using Expo Router
+- JSON file-based storage (you can use any database)
+
+Create the following structure in your Expo project:
+
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── [...route]+api.ts          # API handler
+│   │   ├── fingerprint-store.json     # Fingerprint storage
+│   │   └── deferred-link-store.json   # Link storage
+│   └── relay/
+│       ├── _layout.tsx                # Relay routes layout
+│       ├── capture.tsx                # Capture screen
+│       └── process.tsx                # Process screen
+└── libs/
+    ├── relay-client.ts                # Client configuration
+    └── relay-server.ts                # Server configuration
+```
+
+## Client Setup
+
+Create a client instance that your app will use:
+
+### src/libs/relay-client.ts
+
+```typescript
+import { RelayExpoClient } from "@korsolutions/relay";
+
+export const relayExpoClient = new RelayExpoClient({
+  serverUrl: "http://localhost:8081/api", // Update for production
+});
+```
+
+For production, update the `serverUrl` to your deployed API endpoint.
+
+## Server Setup
+
+### 1. Create Storage Files
+
+Create empty storage files for fingerprints and deferred links:
+
+```bash
+mkdir -p src/app/api
+echo '{}' > src/app/api/fingerprint-store.json
+echo '[]' > src/app/api/deferred-link-store.json
+```
+
+### 2. Configure the Server
+
+Create the server configuration file:
+
+### src/libs/relay-server.ts
+
+```typescript
+import { createRelayServer } from "@korsolutions/relay";
+import { readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
+const storePath = path.join(process.cwd(), "src/app/api/fingerprint-store.json");
+const linkStorePath = path.join(process.cwd(), "src/app/api/deferred-link-store.json");
+
+export const relayServer = createRelayServer({
+  hooks: {
+    onMatchFound: async (deferredLink) => {
+      console.log("Match found for deferred link:", deferredLink);
+      // Add custom logic here (e.g., send analytics, update database)
+    },
+  },
+  deferredLink: {
+    methods: {
+      storeDeferredLink: async (deferredLink) => {
+        const store = JSON.parse(readFileSync(linkStorePath, "utf-8"));
+        store.push(deferredLink);
+        writeFileSync(linkStorePath, JSON.stringify(store, null, 2), "utf-8");
+      },
+      getDeferredLinkByFingerprintHash: async (fingerprintHash) => {
+        const store = JSON.parse(readFileSync(linkStorePath, "utf-8"));
+        return store.find((link) => link.fingerprintHash === fingerprintHash) || null;
+      },
+      deleteDeferredLink: async (id) => {
+        let store = JSON.parse(readFileSync(linkStorePath, "utf-8"));
+        store = store.filter((link) => link.id !== id);
+        writeFileSync(linkStorePath, JSON.stringify(store, null, 2), "utf-8");
+      },
+    },
+  },
+  fingerprint: {
+    methods: {
+      storeFingerprint: async (fingerprint, hash) => {
+        const id = new Date().getTime().toString();
+        const record = { ...fingerprint, hash, id, createdDate: new Date() };
+        const store = JSON.parse(readFileSync(storePath, "utf-8"));
+        store[hash] = record;
+        writeFileSync(storePath, JSON.stringify(store, null, 2), "utf-8");
+        return record;
+      },
+      getFingerprintByHash: async (hash) => {
+        const store = JSON.parse(readFileSync(storePath, "utf-8"));
+        const record = Object.values(store).find((rec) => rec.hash === hash) || null;
+        return record;
+      },
+      listAllFingerprints: async () => {
+        const store = JSON.parse(readFileSync(storePath, "utf-8"));
+        return Object.values(store);
+      },
+    },
+  },
+});
+```
+
+### 3. Create API Routes
+
+Set up the API handler using Expo Router:
+
+### src/app/api/[...route]+api.ts
+
+```typescript
+import { relayServer } from "@/libs/relay-server";
+
+export const GET = (request: Request) => {
+  return relayServer.handler(request);
+};
+
+export const POST = (request: Request) => {
+  return relayServer.handler(request);
+};
+```
+
+## Create Capture Screen
+
+The capture screen handles the first part of the deferred linking flow:
+
+### src/app/relay/capture.tsx
+
+```typescript
+import { relayExpoClient } from "@/libs/relay-client";
+import { useLocalSearchParams } from "expo-router";
+import React, { useEffect } from "react";
+import { StyleSheet, Text, View } from "react-native";
+
+export default function RelayCaptureScreen() {
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+
+  useEffect(() => {
+    if (!returnTo) return;
+    relayExpoClient.capture(returnTo);
+  }, [returnTo]);
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Capture Screen</Text>
+      <Text>Capturing relay data...</Text>
+      <Text>Return URL: {returnTo ?? "N/A"}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignSelf: "center",
+    justifyContent: "center",
+    padding: 20,
+    gap: 20,
+    maxWidth: 400,
+    width: "100%",
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+});
+```
+
+## Create Process Screen
+
+The process screen handles matching and redirection:
+
+### src/app/relay/process.tsx
+
+```typescript
+import { relayExpoClient } from "@/libs/relay-client";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { StyleSheet, Text, View, ActivityIndicator } from "react-native";
+
+export default function RelayProcessScreen() {
+  const router = useRouter();
+  const [status, setStatus] = useState<"processing" | "found" | "not-found">("processing");
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    processRelay();
+  }, []);
+
+  const processRelay = async () => {
+    try {
+      const result = await relayExpoClient.process();
+
+      if (result.url) {
+        setUrl(result.url);
+        setStatus("found");
+        // Redirect to the matched URL
+        // router.push(result.url);
+      } else {
+        setStatus("not-found");
+      }
+    } catch (error) {
+      console.error("Error processing relay:", error);
+      setStatus("not-found");
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Process Screen</Text>
+
+      {status === "processing" && (
+        <>
+          <ActivityIndicator size="large" />
+          <Text>Processing relay data...</Text>
+        </>
+      )}
+
+      {status === "found" && (
+        <>
+          <Text>Match found!</Text>
+          <Text>Redirecting to: {url}</Text>
+        </>
+      )}
+
+      {status === "not-found" && (
+        <Text>No match found. This is a new user.</Text>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignSelf: "center",
+    justifyContent: "center",
+    padding: 20,
+    gap: 20,
+    maxWidth: 400,
+    width: "100%",
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+});
+```
+
+## Configure Expo Router
+
+Ensure your app.json is configured for server rendering:
+
+```json
+{
+  "expo": {
+    "web": {
+      "output": "server"
+    }
+  }
+}
+```
+
+## Test Your Setup
+
+1. Start your Expo development server:
+
+```bash
+pnpm web
+```
+
+2. Test the capture flow:
+
+Visit `http://localhost:8081/relay/capture?returnTo=https://example.com/invite/123`
+
+3. Test the process flow:
+
+Visit `http://localhost:8081/relay/process`
+
+If everything is set up correctly, you should see a match on the second visit from the same device!
+
+## Next Steps
+
+- [Client Configuration](/docs/client) - Learn more about client-side setup
+- [Server Configuration](/docs/server) - Deep dive into server configuration
+- [Database Integration](/docs/database) - Use a real database instead of JSON files
+- [Production Deployment](/docs/deployment) - Deploy Relay to production

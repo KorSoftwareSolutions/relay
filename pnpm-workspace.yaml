@@ -1,13 +1,16 @@
 packages:
   - package
+  - docs
   - examples/*
 
 catalog:
-  typescript: ^5.9.3
   tsdown: ^0.18.0
+  typescript: ^5.9.3
 
 onlyBuiltDependencies:
-  - "@prisma/client"
-  - "@prisma/engines"
+  - '@prisma/client'
+  - '@prisma/engines'
+  - esbuild
   - prisma
+  - sharp
   - unrs-resolver
