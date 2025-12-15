@@ -1,9 +1,10 @@
+import { Logo } from "@/assets/logo";
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
-      title: "Relay",
+      title: <Logo />,
     },
     githubUrl: "https://github.com/korsoftwaresolutions/relay",
   };
