@@ -1,0 +1,25 @@
+{
+  "name": "@korsolutions/relay-monorepo",
+  "version": "0.1.0",
+  "description": "Monorepo for Relay - Deferred linking and referral attribution library",
+  "private": true,
+  "scripts": {},
+  "keywords": [
+    "referral",
+    "attribution",
+    "deferred-linking",
+    "typescript",
+    "monorepo"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.0.2",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.26.0"
+}
