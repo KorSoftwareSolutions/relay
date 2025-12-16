@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/public/relay-banner.svg" alt="Relay" width="600" />
+  <img src="banner.svg" alt="Relay" width="300" />
 
   <h1>Relay</h1>
 
@@ -25,23 +25,21 @@ Relay is a **privacy-focused deferred linking solution** that helps you track re
 
 ## Why Relay?
 
-### = Privacy-First
+### Privacy-First
 
 No third-party tracking services. Your user data stays on your infrastructure. Full GDPR/CCPA compliance control.
 
-### =� Bring Your Own Database
+### Bring Your Own Database
+Works with any storage solution: JSON files, PostgreSQL, MongoDB, Redis, or your custom database. You control where and how data is stored.
 
-Works with any storage solutionJSON files, PostgreSQL, MongoDB, Redis, or your custom database. You control where and how data is stored.
-
-### � Simple Integration
+### Simple Integration
 
 Two-phase flow: capture fingerprints on referral visit, process attribution on signup. Just two API calls to implement.
 
-### <� Flexible Attribution
-
+### Flexible Attribution
 Track referrals, measure marketing campaigns, implement deep linking, or build custom attribution logic with hooks.
 
-### =� Zero External Dependencies
+### Zero External Dependencies
 
 No analytics SDKs, no tracking pixels, no external services. Just your app and your server.
 
@@ -147,22 +145,22 @@ When the user completes signup:
 
 ## Features
 
--  **Device Fingerprinting** - Anonymous, privacy-preserving identification
--  **Flexible Storage** - Bring your own database or use built-in adapters
--  **Server Hooks** - Customize behavior at capture and process stages
--  **Type Safety** - Full TypeScript support with Zod validation
--  **Expo Compatible** - Built specifically for Expo and React Native
--  **Self-Hosted** - Complete control over your infrastructure
--  **Zero Dependencies** - No external services or tracking SDKs
+- **Device Fingerprinting** - Anonymous, privacy-preserving identification
+- **Flexible Storage** - Bring your own database or use built-in adapters
+- **Server Hooks** - Customize behavior at capture and process stages
+- **Type Safety** - Full TypeScript support with Zod validation
+- **Expo Compatible** - Built specifically for Expo and React Native
+- **Self-Hosted** - Complete control over your infrastructure
+- **Zero Dependencies** - No external services or tracking SDKs
 
 ## Documentation
 
-Visit [ionkorol.github.io/relay](https://ionkorol.github.io/relay) for full documentation:
+Visit [korsoftwaresolutions.github.io/relay](https://korsoftwaresolutions.github.io/relay) for full documentation:
 
-- [Installation Guide](https://ionkorol.github.io/relay/docs/installation)
-- [Client API Reference](https://ionkorol.github.io/relay/docs/client)
-- [Server API Reference](https://ionkorol.github.io/relay/docs/server)
-- [Complete API Documentation](https://ionkorol.github.io/relay/docs/api-reference)
+- [Installation Guide](https://korsoftwaresolutions.github.io/relay/docs/installation)
+- [Client API Reference](https://korsoftwaresolutions.github.io/relay/docs/client)
+- [Server API Reference](https://korsoftwaresolutions.github.io/relay/docs/server)
+- [Complete API Documentation](https://korsoftwaresolutions.github.io/relay/docs/api-reference)
 
 ## Examples
 
@@ -177,7 +175,7 @@ Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTIN
 
 ## Security
 
-If you discover a security vulnerability, please email security@korsolutions.com. Do not open public issues for security concerns.
+If you discover a security vulnerability, please email contact@korsolutions.net. Do not open public issues for security concerns.
 
 ## License
 
@@ -186,9 +184,3 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## Acknowledgments
 
 Relay is built and maintained by [Kor Solutions](https://github.com/KorSoftwareSolutions).
-
----
-
-<div align="center">
-  <sub>Built with d for privacy-conscious developers</sub>
-</div>
