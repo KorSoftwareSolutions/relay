@@ -123,7 +123,6 @@ const server = createRelayServer({
     methods: {
       storeFingerprint: async (fp, hash) => { /* ... */ },
       getFingerprintByHash: async (hash) => { /* ... */ },
-      listAllFingerprints: async () => { /* ... */ },
     },
   },
   deferredLink: {
@@ -175,7 +174,6 @@ interface FingerprintSdkOptions {
     parseFingerprint?: (data: any) => Fingerprint;
     storeFingerprint: (data: Fingerprint, hash: string) => Promise<FingerprintDbRecord>;
     getFingerprintByHash: (hash: string) => Promise<FingerprintDbRecord | null>;
-    listAllFingerprints: () => Promise<FingerprintDbRecord[]>;
   };
 }
 ```
@@ -185,7 +183,6 @@ interface FingerprintSdkOptions {
 - `parseFingerprint` (optional): Custom fingerprint parsing function. Defaults to Zod validation.
 - `storeFingerprint`: Store a fingerprint with its hash
 - `getFingerprintByHash`: Retrieve a fingerprint by its hash
-- `listAllFingerprints`: List all stored fingerprints
 
 #### DeferredLinkSdkOptions
 
@@ -349,21 +346,6 @@ Fingerprint
 **Status Codes:**
 - `200`: Success (even if no match found, check `url` for `null`)
 - `400`: Invalid request body
-- `500`: Server error
-
-### GET /relay/fingerprints
-
-List all stored fingerprints (for debugging).
-
-**Response:**
-```typescript
-{
-  fingerprints: FingerprintDbRecord[]
-}
-```
-
-**Status Codes:**
-- `200`: Success
 - `500`: Server error
 
 ## Validation Schemas

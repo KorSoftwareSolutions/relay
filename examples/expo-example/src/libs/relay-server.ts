@@ -44,10 +44,6 @@ export const relayServer = createRelayServer({
         const record = Object.values(store).find((rec: any) => rec.hash === hash) || null;
         return record as any;
       },
-      listAllFingerprints: async () => {
-        const store = JSON.parse(readFileSync(storePath, "utf-8"));
-        return Object.values(store);
-      },
     },
   },
 });

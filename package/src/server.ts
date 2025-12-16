@@ -73,10 +73,6 @@ export const createRelayServer = (config: RelayConfig): RelayServer => {
         response.url = deferredLink.url;
         return Response.json(response, { status: 200 });
       }
-      if (request.method === "GET" && request.url.endsWith("/relay/fingerprints")) {
-        const fingerprints = await fingerprintSdk.listAllFingerprints?.();
-        return Response.json({ fingerprints }, { status: 200 });
-      }
       return Response.json({ error: "Not Found" }, { status: 404 });
     },
   };

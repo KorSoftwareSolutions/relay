@@ -23,9 +23,6 @@ export const relayServer = createRelayServer({
       getFingerprintByHash: async (hash) => {
         // Retrieve fingerprint from database
       },
-      listAllFingerprints: async () => {
-        // List all fingerprints
-      },
     },
   },
   deferredLink: {
@@ -66,9 +63,6 @@ interface FingerprintMethods {
 
   // Retrieve a fingerprint by its hash
   getFingerprintByHash: (hash: string) => Promise<FingerprintDbRecord | null>;
-
-  // List all stored fingerprints
-  listAllFingerprints: () => Promise<FingerprintDbRecord[]>;
 }
 ```
 
@@ -133,10 +127,6 @@ export const relayServer = createRelayServer({
         const store = JSON.parse(readFileSync(storePath, "utf-8"));
         return store[hash] || null;
       },
-      listAllFingerprints: async () => {
-        const store = JSON.parse(readFileSync(storePath, "utf-8"));
-        return Object.values(store);
-      },
     },
   },
   deferredLink: {
@@ -185,12 +175,6 @@ export const relayServer = createRelayServer({
           [hash]
         );
         return result.rows[0] || null;
-      },
-      listAllFingerprints: async () => {
-        const result = await db.query(
-          `SELECT * FROM fingerprints ORDER BY created_at DESC`
-        );
-        return result.rows;
       },
     },
   },
@@ -258,11 +242,6 @@ export const relayServer = createRelayServer({
       getFingerprintByHash: async (hash) => {
         return await prisma.fingerprint.findUnique({
           where: { hash },
-        });
-      },
-      listAllFingerprints: async () => {
-        return await prisma.fingerprint.findMany({
-          orderBy: { createdDate: 'desc' },
         });
       },
     },
@@ -353,17 +332,6 @@ Processes a fingerprint and returns any matching deferred link.
 ```typescript
 {
   url: string | null // The matched URL, or null if no match
-}
-```
-
-### GET /relay/fingerprints
-
-Lists all stored fingerprints (useful for debugging).
-
-**Response:**
-```typescript
-{
-  fingerprints: FingerprintDbRecord[]
 }
 ```
 

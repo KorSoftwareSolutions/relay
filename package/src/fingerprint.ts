@@ -30,7 +30,6 @@ export interface FingerprintMethods {
   parseFingerprint: (data: any) => Fingerprint;
   storeFingerprint: (data: Fingerprint, hash: string) => Promise<FingerprintDbRecord>;
   getFingerprintByHash: (hash: string) => Promise<FingerprintDbRecord | null>;
-  listAllFingerprints: () => Promise<FingerprintDbRecord[]>;
 }
 
 export type FingerprintSdkOptions = {
@@ -39,7 +38,6 @@ export type FingerprintSdkOptions = {
     parseFingerprint?: FingerprintMethods["parseFingerprint"];
     storeFingerprint: FingerprintMethods["storeFingerprint"];
     getFingerprintByHash: FingerprintMethods["getFingerprintByHash"];
-    listAllFingerprints: FingerprintMethods["listAllFingerprints"];
   };
 };
 
@@ -58,11 +56,6 @@ export const createFingerprintSdk = ({ methods }: FingerprintSdkOptions): Finger
       methods?.getFingerprintByHash ??
       (async () => {
         throw new Error("getFingerprintByHash method not implemented");
-      }),
-    listAllFingerprints:
-      methods?.listAllFingerprints ??
-      (async () => {
-        throw new Error("listAllFingerprints method not implemented");
       }),
   };
 };
