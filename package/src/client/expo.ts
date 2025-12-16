@@ -2,9 +2,9 @@ import * as ExpoDevice from "expo-device";
 import * as Localization from "expo-localization";
 import * as Clipboard from "expo-clipboard";
 import { Dimensions, PixelRatio } from "react-native";
-import { type Fingerprint } from "./fingerprint";
-import type { RelayClient, RelayClientOptions } from "./client";
-import type { CaptureRequest, ProcessRequest, ProcessResponse } from "./server";
+import { type Fingerprint } from "../fingerprint";
+import type { RelayClient, RelayClientOptions } from ".";
+import type { CaptureRequest, ProcessRequest, ProcessResponse } from "../server";
 
 const getTimeZone = () => {
   return Localization.getCalendars()[0]?.timeZone || null;

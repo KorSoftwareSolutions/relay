@@ -7,6 +7,21 @@ description: Complete API reference for Relay client and server
 
 Complete reference for all Relay types, interfaces, and methods.
 
+## Package Exports
+
+Relay provides two entry points to avoid loading React Native dependencies on the server:
+
+- **`@korsolutions/relay`** - Server-side exports (safe for Node.js, Hono, Express, etc.)
+- **`@korsolutions/relay/client`** - Client-side exports (requires React Native/Expo)
+
+```typescript
+// Server-side (Node.js, Hono, etc.)
+import { createRelayServer } from "@korsolutions/relay";
+
+// Client-side (React Native/Expo)
+import { RelayExpoClient } from "@korsolutions/relay/client";
+```
+
 ## Client API
 
 ### RelayExpoClient
@@ -491,15 +506,21 @@ const DEFAULT_EXPIRY_DAYS = 7;
 
 ## TypeScript Support
 
-Relay is written in TypeScript and provides full type definitions. All types are exported from the main package:
+Relay is written in TypeScript and provides full type definitions. Types are exported from both entry points:
 
 ```typescript
+// Server-side types
 import type {
   Fingerprint,
   FingerprintDbRecord,
   DeferredLink,
-  RelayClientOptions,
   RelayConfig,
   ProcessResponse,
 } from "@korsolutions/relay";
+
+// Client-side types (also includes server types)
+import type {
+  RelayExpoClient,
+  RelayClientOptions,
+} from "@korsolutions/relay/client";
 ```

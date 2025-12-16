@@ -1,4 +1,4 @@
-import type { ProcessResponse } from "./server";
+import type { ProcessResponse } from "../server";
 
 export interface RelayClient {
   /**
@@ -16,3 +16,8 @@ export interface RelayClient {
 export interface RelayClientOptions {
   serverUrl: string;
 }
+
+export * from "./expo";
+export type * from "../server";
+export type * from "../fingerprint";
+export type * from "../deferred-link";
