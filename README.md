@@ -205,9 +205,10 @@ Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTIN
 
 If you discover a security vulnerability, please email contact@korsolutions.net. Do not open public issues for security concerns.
 
+
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+Relay is released under the [O'Saasy License](https://github.com/KorSoftwareSolutions/license/blob/main/SAAS-LICENSE.MD).
 
 ## Acknowledgments
 
