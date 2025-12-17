@@ -89,28 +89,55 @@ if (result.referralCode) {
 import { createRelayServer } from "@korsolutions/relay/server";
 
 const relay = createRelayServer({
-  storage: {
-    async save(fingerprint, data) {
-      // Save to your database
-      await db.fingerprints.create({ fingerprint, ...data });
+  fingerprint: {
+    methods: {
+      storeFingerprint: async (fingerprint, hash) => {
+        // Save to your database
+        return await db.fingerprints.create({ fingerprint, hash });
+      },
+      getFingerprintByHash: async (hash) => {
+        // Retrieve from your database
+        return await db.fingerprints.findOne({ hash });
+      },
     },
-    async get(fingerprint) {
-      // Retrieve from your database
-      return await db.fingerprints.findOne({ fingerprint });
+  },
+  deferredLink: {
+    methods: {
+      storeDeferredLink: async (link) => {
+        await db.deferredLinks.create(link);
+      },
+      getDeferredLinkByFingerprintHash: async (hash) => {
+        return await db.deferredLinks.findOne({ fingerprintHash: hash });
+      },
+      deleteDeferredLink: async (id) => {
+        await db.deferredLinks.delete(id);
+      },
+    },
+  },
+  hooks: {
+    onMatchFound: async (deferredLink, authCtx) => {
+      // React to successful matches with access to authenticated user
+      if (authCtx?.userId) {
+        // Award referral points, send notifications, etc.
+        await rewardReferral(authCtx.userId, deferredLink);
+      }
     },
   },
 });
 
-// Capture endpoint
-app.post("/api/relay/capture", async (req, res) => {
-  const result = await relay.capture(req.body);
-  res.json(result);
-});
+// Handler with auth context
+app.post("/api/relay/*", async (req, res) => {
+  const user = await getUserFromSession(req);
+  const request = new Request(req.url, {
+    method: req.method,
+    body: JSON.stringify(req.body),
+  });
 
-// Process endpoint
-app.post("/api/relay/process", async (req, res) => {
-  const result = await relay.process(req.body);
-  res.json(result);
+  const response = await relay.handler(request, {
+    userId: user?.id ?? null,
+  });
+
+  res.status(response.status).json(await response.json());
 });
 ```
 
@@ -146,8 +173,9 @@ When the user completes signup:
 ## Features
 
 - **Device Fingerprinting** - Anonymous, privacy-preserving identification
+- **Authentication Context** - Pass user information to hooks for immediate referral attribution
 - **Flexible Storage** - Bring your own database or use built-in adapters
-- **Server Hooks** - Customize behavior at capture and process stages
+- **Server Hooks** - Customize behavior at capture and process stages with access to authenticated user data
 - **Type Safety** - Full TypeScript support with Zod validation
 - **Expo Compatible** - Built specifically for Expo and React Native
 - **Self-Hosted** - Complete control over your infrastructure

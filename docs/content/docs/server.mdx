@@ -93,9 +93,15 @@ interface DeferredLink {
 ```typescript
 interface RelayHooks {
   // Called when a fingerprint match is found
-  onMatchFound?: (deferredLink: DeferredLink) => Promise<void> | void;
+  onMatchFound?: (deferredLink: DeferredLink, authCtx?: RelayAuthContext) => Promise<void> | void;
+}
+
+interface RelayAuthContext {
+  userId: string | null;
 }
 ```
+
+The `onMatchFound` hook receives an optional `authCtx` parameter that contains authenticated user information. This is useful for attributing referrals directly to the signed-in user.
 
 ## Storage Examples
 
@@ -337,18 +343,31 @@ Processes a fingerprint and returns any matching deferred link.
 
 ## Setting Up the Handler
 
+The `handler` function accepts an optional second parameter for authentication context:
+
+```typescript
+handler: (request: Request, authCtx?: RelayAuthContext) => Promise<Response>
+```
+
 ### With Expo Router
 
 ```typescript
 // app/api/[...route]+api.ts
 import { relayServer } from "@/libs/relay-server";
+import { getUserFromSession } from "@/libs/auth"; // Your auth library
 
 export const GET = (request: Request) => {
   return relayServer.handler(request);
 };
 
-export const POST = (request: Request) => {
-  return relayServer.handler(request);
+export const POST = async (request: Request) => {
+  // Extract user information from session/JWT
+  const user = await getUserFromSession(request);
+
+  // Pass auth context to the handler
+  return relayServer.handler(request, {
+    userId: user?.id ?? null,
+  });
 };
 ```
 
@@ -402,19 +421,20 @@ Hooks let you react to events in the Relay flow:
 
 ### onMatchFound Hook
 
-Called when a fingerprint match is found:
+Called when a fingerprint match is found. The hook receives the matched deferred link and optional authentication context:
 
 ```typescript
 export const relayServer = createRelayServer({
   // ... storage config
   hooks: {
-    onMatchFound: async (deferredLink) => {
+    onMatchFound: async (deferredLink, authCtx) => {
       console.log(`Match found for link: ${deferredLink.url}`);
 
       // Send analytics event
       await analytics.track('deferred_link_matched', {
         url: deferredLink.url,
         fingerprintHash: deferredLink.fingerprintHash,
+        userId: authCtx?.userId,
       });
 
       // Update database
@@ -426,6 +446,65 @@ export const relayServer = createRelayServer({
   },
 });
 ```
+
+### Using Auth Context for Referral Attribution
+
+The auth context is particularly useful for referral programs. When a user signs up through a referral link, you can use the auth context to attribute the referral to the new user:
+
+```typescript
+export const relayServer = createRelayServer({
+  // ... storage config
+  hooks: {
+    onMatchFound: async (deferredLink, authCtx) => {
+      // Extract referral code from the deferred link URL
+      const url = new URL(deferredLink.url);
+      const referralCode = url.searchParams.get('ref');
+
+      if (!referralCode) {
+        console.log('No referral code found in URL');
+        return;
+      }
+
+      // If we have an authenticated user, attribute the referral
+      if (authCtx?.userId) {
+        // Find the referrer by their referral code
+        const referrer = await db.users.findOne({ referralCode });
+
+        if (referrer) {
+          // Create a referral record
+          await db.referrals.create({
+            referrerId: referrer.id,
+            referredUserId: authCtx.userId,
+            referralCode: referralCode,
+            matchedAt: new Date(),
+          });
+
+          // Award points or credits to the referrer
+          await db.users.update(referrer.id, {
+            referralPoints: referrer.referralPoints + 100,
+          });
+
+          // Send notification to the referrer
+          await notifications.send(referrer.id, {
+            title: 'New Referral!',
+            body: 'Someone signed up using your referral code',
+          });
+
+          console.log(`Referral attributed: ${referrer.id} referred ${authCtx.userId}`);
+        }
+      } else {
+        console.log('No authenticated user - referral will be attributed after login');
+      }
+    },
+  },
+});
+```
+
+This pattern allows you to:
+1. Track which user signed up through which referral link
+2. Award referral bonuses immediately upon signup
+3. Send real-time notifications to referrers
+4. Maintain a complete audit trail of referrals
 
 ## Fingerprint Hashing
 

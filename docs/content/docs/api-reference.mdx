@@ -156,12 +156,14 @@ const server = createRelayServer({
 
 ```typescript
 interface RelayServer {
-  handler: (request: Request) => Promise<Response>;
+  handler: (request: Request, authCtx?: RelayAuthContext) => Promise<Response>;
 }
 ```
 
 **Methods:**
 - `handler`: Request handler function for processing Relay API requests
+  - `request`: The incoming HTTP request
+  - `authCtx` (optional): Authentication context containing user information
 
 #### RelayConfig
 
@@ -170,7 +172,7 @@ interface RelayConfig {
   fingerprint: FingerprintSdkOptions;
   deferredLink: DeferredLinkSdkOptions;
   hooks?: {
-    onMatchFound?: (deferredLink: DeferredLink) => Promise<void> | void;
+    onMatchFound?: (deferredLink: DeferredLink, authCtx?: RelayAuthContext) => Promise<void> | void;
   };
 }
 ```
@@ -179,6 +181,31 @@ interface RelayConfig {
 - `fingerprint`: Fingerprint storage and processing configuration
 - `deferredLink`: Deferred link storage configuration
 - `hooks`: Optional event hooks
+  - `onMatchFound`: Called when a fingerprint match is found. Receives the matched deferred link and optional auth context
+
+#### RelayAuthContext
+
+```typescript
+interface RelayAuthContext {
+  userId: string | null;
+}
+```
+
+**Properties:**
+- `userId`: The authenticated user's ID, or `null` if not authenticated
+
+**Usage:**
+
+Pass auth context to the handler to make user information available in hooks:
+
+```typescript
+export const POST = async (request: Request) => {
+  const user = await getUserFromSession(request);
+  return relayServer.handler(request, {
+    userId: user?.id ?? null,
+  });
+};
+```
 
 #### FingerprintSdkOptions
 

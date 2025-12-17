@@ -64,7 +64,7 @@ export class RelayExpoClient implements RelayClient {
       fingerprint,
     };
 
-    const response = await fetch(`${this.options.serverUrl}/relay/capture`, {
+    const response = await fetch(`${this.options.serverUrl}/capture`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -80,7 +80,7 @@ export class RelayExpoClient implements RelayClient {
     const fingerprint = await calculateFingerprint();
     const request: ProcessRequest = fingerprint;
 
-    const response = await fetch(`${this.options.serverUrl}/relay/process`, {
+    const response = await fetch(`${this.options.serverUrl}/process`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

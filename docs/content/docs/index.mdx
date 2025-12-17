@@ -57,10 +57,11 @@ Relay generates a new fingerprint and matches it against stored fingerprints to 
 ## Key Features
 
 - 🎯 **Accurate Attribution**: Uses multi-factor device fingerprinting
+- 👤 **Auth Context Support**: Pass authenticated user info to hooks for immediate referral attribution
 - 📱 **Expo & React Native**: Built specifically for mobile apps
 - 🔒 **Privacy-Focused**: No third-party tracking services required
 - ⚙️ **Flexible Storage**: Bring your own database (file-based, SQL, NoSQL)
-- 🪝 **Customizable Hooks**: React to match events with custom logic
+- 🪝 **Customizable Hooks**: React to match events with custom logic and access to user context
 - 📊 **Built-in Analytics**: Track fingerprints and link performance
 
 ## Quick Start
@@ -75,16 +76,43 @@ See the [Installation Guide](/docs/installation) for detailed setup instructions
 
 ## Use Cases
 
-### Referral Programs
+### Referral Programs with Auth Context
 
-Track who referred each new user and reward them accordingly:
+Track who referred each new user and reward them immediately upon signup using authentication context:
 
 ```typescript
+// Client: Process the fingerprint after user signs up
 const result = await relayExpoClient.process();
-if (result.url) {
-  const referrerId = extractReferrerFromUrl(result.url);
-  await rewardReferrer(referrerId);
-}
+
+// Server: Use auth context in the onMatchFound hook
+const relay = createRelayServer({
+  hooks: {
+    onMatchFound: async (deferredLink, authCtx) => {
+      if (authCtx?.userId) {
+        // Extract referral code from the deferred link
+        const url = new URL(deferredLink.url);
+        const referralCode = url.searchParams.get('ref');
+
+        // Find the referrer and award points
+        const referrer = await db.users.findOne({ referralCode });
+        if (referrer) {
+          await db.referrals.create({
+            referrerId: referrer.id,
+            referredUserId: authCtx.userId,
+            referralCode,
+          });
+          await rewardReferrer(referrer.id, 100);
+        }
+      }
+    },
+  },
+});
+
+// Handler passes auth context from session
+export const POST = async (request: Request) => {
+  const user = await getUserFromSession(request);
+  return relay.handler(request, { userId: user?.id ?? null });
+};
 ```
 
 ### Marketing Attribution
