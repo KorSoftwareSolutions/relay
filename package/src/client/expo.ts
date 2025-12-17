@@ -2,7 +2,7 @@ import * as ExpoDevice from "expo-device";
 import * as Localization from "expo-localization";
 import * as Clipboard from "expo-clipboard";
 import { Dimensions, PixelRatio } from "react-native";
-import { type Fingerprint } from "../fingerprint";
+import { type Fingerprint } from "../fingerprint.types";
 import type { RelayClient, RelayClientOptions } from ".";
 import type { CaptureRequest, ProcessRequest, ProcessResponse } from "../server";
 

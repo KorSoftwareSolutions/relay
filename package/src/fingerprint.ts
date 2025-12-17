@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import z from "zod";
+import type { Fingerprint } from "./fingerprint.types";
 
 export const fingerprintSchema = z.object({
   clipboardValue: z.string().nullable(),
@@ -14,8 +15,6 @@ export const fingerprintSchema = z.object({
   timeZone: z.string().nullable(),
   languageTags: z.array(z.string()),
 });
-
-export type Fingerprint = z.infer<typeof fingerprintSchema>;
 
 export interface FingerprintDbRecord extends Fingerprint {
   hash: string;
@@ -79,8 +78,8 @@ const defaultHashFingerprint = async (data: Fingerprint): Promise<string> => {
   return generateHash(stringToHash);
 };
 
-const defaultParseFingerprint = (data: any): Fingerprint => {
-  return fingerprintSchema.parse(data);
+const defaultParseFingerprint = (data: unknown) => {
+  return fingerprintSchema.parse(data) satisfies Fingerprint;
 };
 
 export const generateHash = (payload: string): string => {

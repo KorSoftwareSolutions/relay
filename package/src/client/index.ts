@@ -19,6 +19,3 @@ export interface RelayClientOptions {
 }
 
 export * from "./expo";
-export type * from "../server";
-export type * from "../fingerprint";
-export type * from "../deferred-link";
