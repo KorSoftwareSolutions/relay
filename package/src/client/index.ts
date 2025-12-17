@@ -15,6 +15,7 @@ export interface RelayClient {
 
 export interface RelayClientOptions {
   serverUrl: string;
+  fetchOptions?: RequestInit;
 }
 
 export * from "./expo";

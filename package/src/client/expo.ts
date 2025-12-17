@@ -65,8 +65,10 @@ export class RelayExpoClient implements RelayClient {
     };
 
     const response = await fetch(`${this.options.serverUrl}/capture`, {
+      ...this.options.fetchOptions,
       method: "POST",
       headers: {
+        ...(this.options.fetchOptions?.headers || {}),
         "Content-Type": "application/json",
       },
       body: JSON.stringify(captureRequest),
@@ -81,8 +83,10 @@ export class RelayExpoClient implements RelayClient {
     const request: ProcessRequest = fingerprint;
 
     const response = await fetch(`${this.options.serverUrl}/process`, {
+      ...this.options.fetchOptions,
       method: "POST",
       headers: {
+        ...(this.options.fetchOptions?.headers || {}),
         "Content-Type": "application/json",
       },
       body: JSON.stringify(request),
