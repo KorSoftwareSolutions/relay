@@ -2,15 +2,19 @@ import z from "zod";
 import { type DeferredLink, type DeferredLinkSdkOptions, DeferredLinkSdk } from "./deferred-link";
 import { createFingerprintSdk, type FingerprintSdkOptions, fingerprintSchema } from "./fingerprint";
 
+export interface RelayAuthContext {
+  userId: string | null;
+}
+
 export interface RelayServer {
-  handler: (request: Request) => Promise<Response>;
+  handler: (request: Request, authCtx?: RelayAuthContext) => Promise<Response>;
 }
 
 export interface RelayConfig {
   fingerprint: FingerprintSdkOptions;
   deferredLink: DeferredLinkSdkOptions;
   hooks?: {
-    onMatchFound?: (deferredLink: DeferredLink) => Promise<void> | void;
+    onMatchFound?: (deferredLink: DeferredLink, authCtx?: RelayAuthContext) => Promise<void> | void;
   };
 }
 
@@ -39,7 +43,7 @@ export const createRelayServer = (config: RelayConfig): RelayServer => {
   const deferredLinkSdk = new DeferredLinkSdk(config.deferredLink);
 
   return {
-    handler: async (request: Request): Promise<Response> => {
+    handler: async (request, authCtx) => {
       if (request.method === "POST" && request.url.endsWith("/relay/capture")) {
         const jsonData = await request.json();
         const requestData = captureRequestSchema.parse(jsonData);
@@ -69,7 +73,7 @@ export const createRelayServer = (config: RelayConfig): RelayServer => {
           return Response.json(response, { status: 200 });
         }
         await deferredLinkSdk.deleteDeferredLink(deferredLink.id);
-        await config.hooks?.onMatchFound?.(deferredLink);
+        await config.hooks?.onMatchFound?.(deferredLink, authCtx);
         response.url = deferredLink.url;
         return Response.json(response, { status: 200 });
       }
