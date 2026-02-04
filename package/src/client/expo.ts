@@ -27,7 +27,7 @@ const calculateFingerprint = async (): Promise<Fingerprint> => {
   return {
     ipAddress: null,
     deviceManufacturer: ExpoDevice.manufacturer,
-    deviceModel: ExpoDevice.modelName,
+    deviceModel: null,
     osName: ExpoDevice.osName,
     osVersion: null,
     screenWidth: screenDimensions.width,
