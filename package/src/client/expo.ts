@@ -1,6 +1,5 @@
 import * as ExpoDevice from "expo-device";
 import * as Localization from "expo-localization";
-import * as Clipboard from "expo-clipboard";
 import { Dimensions, PixelRatio } from "react-native";
 import { type Fingerprint } from "../fingerprint.types";
 import type { RelayClient, RelayClientOptions } from ".";
@@ -12,17 +11,14 @@ const getTimeZone = () => {
 
 const getLanguageTags = () => {
   const locales = Localization.getLocales();
-  const localeLanguageTags = locales.map((locale) => locale.languageTag);
-  return localeLanguageTags.sort();
-};
-
-const getClipboardValue = async (): Promise<string | null> => {
-  try {
-    const clipboardContent = await Clipboard.getStringAsync();
-    return clipboardContent || null;
-  } catch {
-    return null;
+  if (!locales.length) {
+    return [];
   }
+  const firstLocale = locales[0];
+  if (!firstLocale?.languageTag) {
+    return [];
+  }
+  return [firstLocale.languageTag];
 };
 
 const calculateFingerprint = async (): Promise<Fingerprint> => {
@@ -39,7 +35,7 @@ const calculateFingerprint = async (): Promise<Fingerprint> => {
     pixelRatio: PixelRatio.get(),
     timeZone: getTimeZone(),
     languageTags: getLanguageTags(),
-    clipboardValue: await getClipboardValue(),
+    clipboardValue: null,
   };
 };
 
