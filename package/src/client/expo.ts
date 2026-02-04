@@ -29,7 +29,7 @@ const calculateFingerprint = async (): Promise<Fingerprint> => {
     deviceManufacturer: ExpoDevice.manufacturer,
     deviceModel: ExpoDevice.modelName,
     osName: ExpoDevice.osName,
-    osVersion: ExpoDevice.osVersion,
+    osVersion: null,
     screenWidth: screenDimensions.width,
     screenHeight: screenDimensions.height,
     pixelRatio: PixelRatio.get(),
